@@ -12,6 +12,7 @@
       "extensions": [
         "ms-python.python",
         "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
         "charliermarsh.ruff"
       ],
       "settings": {
@@ -28,7 +29,7 @@
     }
   },
   
-  "postCreateCommand": "git submodule update --init --recursive && pip install -r requirements.txt",
+  "postCreateCommand": "pip install -r requirements.txt",
   
   "forwardPorts": [8000],
   
