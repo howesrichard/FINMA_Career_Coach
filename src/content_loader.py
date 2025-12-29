@@ -11,12 +11,13 @@ from typing import Dict
 class ContentLoader:
     """Loads reference materials from .typ files."""
 
-    def __init__(self, reference_path: str = None):
+    def __init__(self, reference_path: str = None, test_mode: bool = False):
         """
         Initialize the content loader.
 
         Args:
             reference_path: Path to reference folder. If None, uses default.
+            test_mode: If True, only load 3 shortest role profiles (for testing)
         """
         if reference_path is None:
             # Default: reference folder in project root
@@ -26,6 +27,7 @@ class ContentLoader:
         self.reference_path = Path(reference_path)
         self.roles_path = self.reference_path / "roles"
         self.taxonomy_path = self.reference_path / "Financial_insto_taxonomy.typ"
+        self.test_mode = test_mode
 
         # Validate paths exist
         if not self.reference_path.exists():
@@ -34,6 +36,7 @@ class ContentLoader:
     def load_role_profiles(self) -> Dict[str, str]:
         """
         Load all role profile files from the roles directory.
+        In test mode, only loads 3 shortest profiles.
 
         Returns:
             Dictionary mapping role filename (without .typ) to file content
@@ -52,6 +55,13 @@ class ContentLoader:
                 content = f.read()
 
             profiles[role_name] = content
+
+        # If test mode, only keep 3 shortest profiles
+        if self.test_mode:
+            # Sort by content length and take 3 shortest
+            sorted_profiles = sorted(profiles.items(), key=lambda x: len(x[1]))
+            profiles = dict(sorted_profiles[:3])
+            print(f"[TEST MODE] Using only 3 shortest role profiles: {', '.join(profiles.keys())}")
 
         return profiles
 

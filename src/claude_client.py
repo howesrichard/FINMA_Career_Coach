@@ -13,12 +13,13 @@ from .prompts import build_system_message_with_context, build_user_profile_conte
 class ClaudeCareerCoach:
     """Career coach using Claude API with reference materials."""
 
-    def __init__(self, use_caching: bool = False):
+    def __init__(self, use_caching: bool = False, test_mode: bool = False):
         """
         Initialize the career coach.
 
         Args:
             use_caching: Whether to use prompt caching (default: False for now)
+            test_mode: If True, only load 3 role profiles (for cheaper testing)
         """
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
@@ -27,10 +28,11 @@ class ClaudeCareerCoach:
         self.client = Anthropic(api_key=api_key)
         self.model = "claude-sonnet-4-5-20250929"
         self.use_caching = use_caching
+        self.test_mode = test_mode
 
         # Load reference materials
         print("Loading reference materials...")
-        loader = ContentLoader()
+        loader = ContentLoader(test_mode=test_mode)
         self.reference_context = loader.build_cached_context()
         print(f"✓ Loaded {len(loader.load_role_profiles())} role profiles")
 
