@@ -1,0 +1,48 @@
+{
+  "name": "FINMA Career Coach - Python, Streamlit, Jupyter",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.11-bullseye",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": true,
+        "python.formatting.autopep8Path": "/usr/local/py-utils/bin/autopep8",
+        "python.formatting.blackPath": "/usr/local/py-utils/bin/black",
+        "python.formatting.yapfPath": "/usr/local/py-utils/bin/yapf",
+        "python.linting.banditPath": "/usr/local/py-utils/bin/bandit",
+        "python.linting.flake8Path": "/usr/local/py-utils/bin/flake8",
+        "python.linting.mypyPath": "/usr/local/py-utils/bin/mypy",
+        "python.linting.pycodestylePath": "/usr/local/py-utils/bin/pycodestyle",
+        "python.linting.pydocstylePath": "/usr/local/py-utils/bin/pydocstyle",
+        "python.linting.pylintPath": "/usr/local/py-utils/bin/pylint"
+      },
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-toolsai.jupyter",
+        "ms-toolsai.jupyter-keymap",
+        "ms-toolsai.jupyter-renderers"
+      ]
+    }
+  },
+
+  "forwardPorts": [8501],
+  "portsAttributes": {
+    "8501": {
+      "label": "Streamlit App",
+      "onAutoForward": "notify"
+    }
+  },
+
+  "postCreateCommand": "pip install --user -r requirements.txt",
+
+  "remoteUser": "vscode"
+}
