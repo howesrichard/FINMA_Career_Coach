@@ -4,7 +4,7 @@ anthropic>=0.8.0
 
 # Jupyter support
 jupyter>=1.0.0
-notebook>=7.0.0
+notebook>=7.2.2
 ipykernel>=6.27.0
 
 # Additional utilities
