@@ -13,13 +13,14 @@ from .prompts import build_system_message_with_context, build_user_profile_conte
 class ClaudeCareerCoach:
     """Career coach using Claude API with reference materials."""
 
-    def __init__(self, use_caching: bool = False, test_mode: bool = False):
+    def __init__(self, use_caching: bool = True, test_mode: bool = True):
         """
         Initialize the career coach.
 
         Args:
-            use_caching: Whether to use prompt caching (default: False for now)
-            test_mode: If True, only load 3 role profiles (for cheaper testing)
+            use_caching: Whether to use prompt caching (default: True)
+            test_mode: If True, only load 3 role profiles (default: True for safety)
+                      Set to False for production with all 20 roles
         """
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:

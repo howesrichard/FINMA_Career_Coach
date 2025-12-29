@@ -67,12 +67,16 @@ def main():
         # Test mode toggle
         test_mode = st.checkbox(
             "Test Mode (3 roles only)",
-            value=st.session_state.get('test_mode', False),
-            help="Use only 3 role profiles for cheaper testing. Uncheck for full experience."
+            value=st.session_state.get('test_mode', True),  # Default to True for safety
+            help="Use only 3 role profiles for cheaper testing. Uncheck for full 20 roles (more expensive)."
         )
 
+        # Warning when test mode is disabled
+        if not test_mode:
+            st.warning("⚠️ Full mode uses ~168k tokens per request. Significantly more expensive!")
+
         # If test mode changed, update and reinitialize
-        if test_mode != st.session_state.get('test_mode', False):
+        if test_mode != st.session_state.get('test_mode', True):
             st.session_state.test_mode = test_mode
             if 'coach' in st.session_state:
                 del st.session_state.coach  # Force reinitialization
