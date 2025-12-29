@@ -1,5 +1,8 @@
 # Core dependencies
 anthropic>=0.18.0
+streamlit>=1.29.0
+
+# Optional: FastAPI (for future API version)
 fastapi>=0.109.0
 uvicorn[standard]>=0.27.0
 
