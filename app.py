@@ -36,8 +36,8 @@ def initialize_coach():
     """Initialize the career coach (cached across reruns)."""
     if 'coach' not in st.session_state:
         with st.spinner("Loading career coach and reference materials..."):
-            # Use test_mode from sidebar setting
-            test_mode = st.session_state.get('test_mode', False)
+            # Use test_mode from sidebar setting (default to True for safety)
+            test_mode = st.session_state.get('test_mode', True)
             st.session_state.coach = ClaudeCareerCoach(
                 use_caching=True,
                 test_mode=test_mode
