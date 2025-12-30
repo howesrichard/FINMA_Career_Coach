@@ -5,6 +5,8 @@ A career coaching chatbot for finance students.
 
 import streamlit as st
 from src.claude_client import ClaudeCareerCoach
+from auth import check_password
+from rate_limiter import RateLimiter, show_rate_limit_info
 
 # Page configuration
 st.set_page_config(
@@ -36,13 +38,13 @@ def initialize_coach():
     """Initialize the career coach (cached across reruns)."""
     if 'coach' not in st.session_state:
         with st.spinner("Loading career coach and reference materials..."):
-            # Use test_mode and use_summaries from sidebar settings (default to True for safety)
+            # Use test_mode from sidebar settings (default to True for safety)
+            # Always use summaries (use_summaries=True) - more efficient
             test_mode = st.session_state.get('test_mode', True)
-            use_summaries = st.session_state.get('use_summaries', True)
             st.session_state.coach = ClaudeCareerCoach(
                 use_caching=True,
                 test_mode=test_mode,
-                use_summaries=use_summaries
+                use_summaries=True  # Always use summaries for efficiency
             )
     return st.session_state.coach
 
@@ -59,6 +61,10 @@ def initialize_session_state():
 def main():
     """Main application."""
 
+    # Check password first
+    if not check_password():
+        st.stop()  # Don't run anything else if not authenticated
+
     # Initialize session state
     initialize_session_state()
 
@@ -66,39 +72,28 @@ def main():
     with st.sidebar:
         st.markdown("### ⚙️ Settings")
 
-        # Use summaries toggle
-        use_summaries = st.checkbox(
-            "Use Role Summaries",
-            value=st.session_state.get('use_summaries', True),  # Default to True for efficiency
-            help="Load concise summaries instead of full profiles. Claude can fetch full details when needed. Saves ~85% tokens."
-        )
-
         # Test mode toggle
         test_mode = st.checkbox(
             "Test Mode (3 roles only)",
             value=st.session_state.get('test_mode', True),  # Default to True for safety
-            help="Use only 3 role profiles for cheaper testing. Uncheck for full 20 roles (more expensive)."
+            help="Use only 3 role profiles for cheaper testing. Uncheck for full 20 roles."
         )
 
-        # Warning when test mode is disabled
-        if not test_mode and not use_summaries:
-            st.warning("⚠️ Full mode with full profiles uses ~168k tokens per request. Very expensive!")
-        elif not test_mode and use_summaries:
-            st.info("ℹ️ Using summaries for all 20 roles (~15-20k tokens). Claude will fetch full details as needed.")
+        # Info about current mode
+        if not test_mode:
+            st.info("ℹ️ Using all 20 role summaries. Claude will fetch full details as needed.")
+        else:
+            st.success("✓ Test mode: Using 3 roles to save costs")
 
-        # If settings changed, update and reinitialize
-        settings_changed = False
+        # If test mode changed, update and reinitialize
         if test_mode != st.session_state.get('test_mode', True):
             st.session_state.test_mode = test_mode
-            settings_changed = True
-        if use_summaries != st.session_state.get('use_summaries', True):
-            st.session_state.use_summaries = use_summaries
-            settings_changed = True
-
-        if settings_changed:
             if 'coach' in st.session_state:
                 del st.session_state.coach  # Force reinitialization
             st.rerun()
+
+        # Show rate limit info
+        show_rate_limit_info()
 
         st.markdown("---")
 
@@ -172,29 +167,40 @@ def main():
         with st.chat_message("user"):
             st.markdown(prompt)
 
-        # Get coach response
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                # Build conversation history for Claude
-                conversation_history = []
-                for msg in st.session_state.messages[:-1]:  # Exclude the current message
-                    conversation_history.append({
-                        "role": msg["role"],
-                        "content": msg["content"]
-                    })
+        # Check rate limit before processing
+        limiter = RateLimiter(max_requests=10, window_minutes=10)
+        allowed, limit_message = limiter.check_rate_limit()
 
-                # Get response from coach
-                response = coach.chat(
-                    user_message=prompt,
-                    conversation_history=conversation_history,
-                    user_profile=st.session_state.user_profile
-                )
+        if not allowed:
+            # Rate limit exceeded
+            with st.chat_message("assistant"):
+                st.error(limit_message)
+            # Remove the user message we just added since we're not processing it
+            st.session_state.messages.pop()
+        else:
+            # Get coach response
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    # Build conversation history for Claude
+                    conversation_history = []
+                    for msg in st.session_state.messages[:-1]:  # Exclude the current message
+                        conversation_history.append({
+                            "role": msg["role"],
+                            "content": msg["content"]
+                        })
 
-                # Display response
-                st.markdown(response)
+                    # Get response from coach
+                    response = coach.chat(
+                        user_message=prompt,
+                        conversation_history=conversation_history,
+                        user_profile=st.session_state.user_profile
+                    )
 
-        # Add assistant response to chat history
-        st.session_state.messages.append({"role": "assistant", "content": response})
+                    # Display response
+                    st.markdown(response)
+
+            # Add assistant response to chat history
+            st.session_state.messages.append({"role": "assistant", "content": response})
 
 
 if __name__ == "__main__":
