@@ -13,7 +13,7 @@ from .prompts import build_system_message_with_context, build_user_profile_conte
 class ClaudeCareerCoach:
     """Career coach using Claude API with reference materials."""
 
-    def __init__(self, use_caching: bool = True, test_mode: bool = True):
+    def __init__(self, use_caching: bool = True, test_mode: bool = True, use_summaries: bool = True):
         """
         Initialize the career coach.
 
@@ -21,6 +21,8 @@ class ClaudeCareerCoach:
             use_caching: Whether to use prompt caching (default: True)
             test_mode: If True, only load 3 role profiles (default: True for safety)
                       Set to False for production with all 20 roles
+            use_summaries: If True, load role summaries (default: True for efficiency)
+                          Set to False to load full profiles
         """
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if not api_key:
@@ -30,12 +32,13 @@ class ClaudeCareerCoach:
         self.model = "claude-sonnet-4-5-20250929"
         self.use_caching = use_caching
         self.test_mode = test_mode
+        self.use_summaries = use_summaries
 
         # Load reference materials
         print("Loading reference materials...")
-        loader = ContentLoader(test_mode=test_mode)
-        self.reference_context = loader.build_cached_context()
-        print(f"✓ Loaded {len(loader.load_role_profiles())} role profiles")
+        self.loader = ContentLoader(test_mode=test_mode, use_summaries=use_summaries)
+        self.reference_context = self.loader.build_cached_context()
+        print(f"✓ Loaded {len(self.loader.load_role_profiles())} role profiles")
 
         # Build system message (with or without caching)
         if self.use_caching:
@@ -45,6 +48,37 @@ class ClaudeCareerCoach:
             from .prompts import SYSTEM_PROMPT
             self.system_message = f"{SYSTEM_PROMPT}\n\n# REFERENCE MATERIALS\n\n{self.reference_context}"
 
+        # Define tools for fetching detailed role profiles
+        self.tools = [
+            {
+                "name": "get_detailed_role_profile",
+                "description": "Fetch the complete detailed profile for a specific role when the summary doesn't provide enough information. Use this when a student asks for in-depth details about day-to-day work, comprehensive skill requirements, detailed career progression, or specific examples.",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "role_name": {
+                            "type": "string",
+                            "description": "The exact name of the role (e.g., 'ecm_analyst_boutique_advisory', 'trader_sales_and_trading'). Must match the role filename without .typ extension."
+                        }
+                    },
+                    "required": ["role_name"]
+                }
+            }
+        ]
+
+    def _execute_tool(self, tool_name: str, tool_input: Dict) -> str:
+        """Execute a tool and return the result."""
+        if tool_name == "get_detailed_role_profile":
+            role_name = tool_input.get("role_name")
+            try:
+                full_profile = self.loader.load_full_role_profile(role_name)
+                return full_profile
+            except FileNotFoundError:
+                available_roles = self.loader.get_available_roles()
+                return f"Error: Role '{role_name}' not found. Available roles: {', '.join(available_roles)}"
+        else:
+            return f"Error: Unknown tool '{tool_name}'"
+
     def chat(
         self,
         user_message: str,
@@ -53,6 +87,7 @@ class ClaudeCareerCoach:
     ) -> str:
         """
         Send a message to Claude and get a response.
+        Handles tool use for fetching detailed role profiles when needed.
 
         Args:
             user_message: The user's question or message
@@ -82,25 +117,54 @@ class ClaudeCareerCoach:
             "content": current_message
         })
 
-        # Make API call
-        if self.use_caching:
-            # With caching: system message is a list of content blocks
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=self.system_message,
-                messages=messages
-            )
-        else:
-            # Without caching: system message is a simple string
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=4096,
-                system=self.system_message,
-                messages=messages
-            )
+        # Make API call with tool support (only if using summaries)
+        api_params = {
+            "model": self.model,
+            "max_tokens": 4096,
+            "system": self.system_message,
+            "messages": messages
+        }
 
-        return response.content[0].text
+        # Add tools if using summaries
+        if self.use_summaries:
+            api_params["tools"] = self.tools
+
+        response = self.client.messages.create(**api_params)
+
+        # Handle tool use in a loop (Claude might call multiple tools)
+        while response.stop_reason == "tool_use":
+            # Extract tool uses from response
+            tool_uses = [block for block in response.content if block.type == "tool_use"]
+
+            # Add assistant's response (including tool uses) to messages
+            messages.append({
+                "role": "assistant",
+                "content": response.content
+            })
+
+            # Execute each tool and collect results
+            tool_results = []
+            for tool_use in tool_uses:
+                result = self._execute_tool(tool_use.name, tool_use.input)
+                tool_results.append({
+                    "type": "tool_result",
+                    "tool_use_id": tool_use.id,
+                    "content": result
+                })
+
+            # Add tool results to messages
+            messages.append({
+                "role": "user",
+                "content": tool_results
+            })
+
+            # Get next response from Claude
+            api_params["messages"] = messages
+            response = self.client.messages.create(**api_params)
+
+        # Extract final text response
+        text_content = [block.text for block in response.content if hasattr(block, 'text')]
+        return "\n".join(text_content) if text_content else ""
 
 
 if __name__ == "__main__":

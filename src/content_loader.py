@@ -11,13 +11,14 @@ from typing import Dict
 class ContentLoader:
     """Loads reference materials from .typ files."""
 
-    def __init__(self, reference_path: str = None, test_mode: bool = False):
+    def __init__(self, reference_path: str = None, test_mode: bool = False, use_summaries: bool = True):
         """
         Initialize the content loader.
 
         Args:
             reference_path: Path to reference folder. If None, uses default.
             test_mode: If True, only load 3 shortest role profiles (for testing)
+            use_summaries: If True, load summary versions of roles instead of full profiles
         """
         if reference_path is None:
             # Default: reference folder in project root
@@ -26,8 +27,10 @@ class ContentLoader:
 
         self.reference_path = Path(reference_path)
         self.roles_path = self.reference_path / "roles"
+        self.summaries_path = self.reference_path / "roles_summary"
         self.taxonomy_path = self.reference_path / "Financial_insto_taxonomy.typ"
         self.test_mode = test_mode
+        self.use_summaries = use_summaries
 
         # Validate paths exist
         if not self.reference_path.exists():
@@ -37,17 +40,28 @@ class ContentLoader:
         """
         Load all role profile files from the roles directory.
         In test mode, only loads 3 shortest profiles.
+        If use_summaries=True, loads from roles_summary folder.
 
         Returns:
             Dictionary mapping role filename (without .typ) to file content
         """
-        if not self.roles_path.exists():
-            raise FileNotFoundError(f"Roles folder not found: {self.roles_path}")
+        # Choose source directory based on use_summaries setting
+        if self.use_summaries:
+            source_path = self.summaries_path
+            if not source_path.exists():
+                print(f"[WARNING] Summaries folder not found: {source_path}")
+                print(f"[WARNING] Falling back to full role profiles")
+                source_path = self.roles_path
+        else:
+            source_path = self.roles_path
+
+        if not source_path.exists():
+            raise FileNotFoundError(f"Roles folder not found: {source_path}")
 
         profiles = {}
 
-        # Find all .typ files in roles directory
-        for typ_file in self.roles_path.glob("*.typ"):
+        # Find all .typ files in source directory
+        for typ_file in source_path.glob("*.typ"):
             role_name = typ_file.stem  # filename without extension
 
             # Read file content as plain text
@@ -61,9 +75,46 @@ class ContentLoader:
             # Sort by content length and take 3 shortest
             sorted_profiles = sorted(profiles.items(), key=lambda x: len(x[1]))
             profiles = dict(sorted_profiles[:3])
-            print(f"[TEST MODE] Using only 3 shortest role profiles: {', '.join(profiles.keys())}")
+            mode_str = "summaries" if self.use_summaries else "full profiles"
+            print(f"[TEST MODE] Using only 3 shortest role {mode_str}: {', '.join(profiles.keys())}")
+        elif self.use_summaries:
+            print(f"[SUMMARY MODE] Loaded {len(profiles)} role summaries")
 
         return profiles
+
+    def load_full_role_profile(self, role_name: str) -> str:
+        """
+        Load the full version of a specific role profile.
+        Used when summaries are loaded initially but full detail is needed.
+
+        Args:
+            role_name: Name of the role (without .typ extension)
+
+        Returns:
+            Full content of the role profile
+
+        Raises:
+            FileNotFoundError: If the role profile doesn't exist
+        """
+        role_file = self.roles_path / f"{role_name}.typ"
+
+        if not role_file.exists():
+            raise FileNotFoundError(f"Role profile not found: {role_name}")
+
+        with open(role_file, 'r', encoding='utf-8') as f:
+            return f.read()
+
+    def get_available_roles(self) -> list[str]:
+        """
+        Get list of all available role names.
+
+        Returns:
+            List of role names (without .typ extension)
+        """
+        if not self.roles_path.exists():
+            return []
+
+        return [f.stem for f in self.roles_path.glob("*.typ")]
 
     def load_taxonomy(self) -> str:
         """

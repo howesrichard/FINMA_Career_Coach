@@ -36,11 +36,13 @@ def initialize_coach():
     """Initialize the career coach (cached across reruns)."""
     if 'coach' not in st.session_state:
         with st.spinner("Loading career coach and reference materials..."):
-            # Use test_mode from sidebar setting (default to True for safety)
+            # Use test_mode and use_summaries from sidebar settings (default to True for safety)
             test_mode = st.session_state.get('test_mode', True)
+            use_summaries = st.session_state.get('use_summaries', True)
             st.session_state.coach = ClaudeCareerCoach(
                 use_caching=True,
-                test_mode=test_mode
+                test_mode=test_mode,
+                use_summaries=use_summaries
             )
     return st.session_state.coach
 
@@ -64,6 +66,13 @@ def main():
     with st.sidebar:
         st.markdown("### ⚙️ Settings")
 
+        # Use summaries toggle
+        use_summaries = st.checkbox(
+            "Use Role Summaries",
+            value=st.session_state.get('use_summaries', True),  # Default to True for efficiency
+            help="Load concise summaries instead of full profiles. Claude can fetch full details when needed. Saves ~85% tokens."
+        )
+
         # Test mode toggle
         test_mode = st.checkbox(
             "Test Mode (3 roles only)",
@@ -72,12 +81,21 @@ def main():
         )
 
         # Warning when test mode is disabled
-        if not test_mode:
-            st.warning("⚠️ Full mode uses ~168k tokens per request. Significantly more expensive!")
+        if not test_mode and not use_summaries:
+            st.warning("⚠️ Full mode with full profiles uses ~168k tokens per request. Very expensive!")
+        elif not test_mode and use_summaries:
+            st.info("ℹ️ Using summaries for all 20 roles (~15-20k tokens). Claude will fetch full details as needed.")
 
-        # If test mode changed, update and reinitialize
+        # If settings changed, update and reinitialize
+        settings_changed = False
         if test_mode != st.session_state.get('test_mode', True):
             st.session_state.test_mode = test_mode
+            settings_changed = True
+        if use_summaries != st.session_state.get('use_summaries', True):
+            st.session_state.use_summaries = use_summaries
+            settings_changed = True
+
+        if settings_changed:
             if 'coach' in st.session_state:
                 del st.session_state.coach  # Force reinitialization
             st.rerun()
