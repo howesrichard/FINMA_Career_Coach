@@ -38,9 +38,9 @@ def initialize_coach():
     """Initialize the career coach (cached across reruns)."""
     if 'coach' not in st.session_state:
         with st.spinner("Loading career coach and reference materials..."):
-            # Use test_mode from sidebar settings (default to True for safety)
+            # Use test_mode from sidebar settings (default to False for production)
             # Always use summaries (use_summaries=True) - more efficient
-            test_mode = st.session_state.get('test_mode', True)
+            test_mode = st.session_state.get('test_mode', False)
             st.session_state.coach = ClaudeCareerCoach(
                 use_caching=True,
                 test_mode=test_mode,
@@ -75,8 +75,8 @@ def main():
         # Test mode toggle
         test_mode = st.checkbox(
             "Test Mode (3 roles only)",
-            value=st.session_state.get('test_mode', True),  # Default to True for safety
-            help="Use only 3 role profiles for cheaper testing. Uncheck for full 20 roles."
+            value=st.session_state.get('test_mode', False),  # Default to False for production
+            help="Use only 3 role profiles for cheaper testing. Check for testing with 3 roles."
         )
 
         # Info about current mode
@@ -86,7 +86,7 @@ def main():
             st.success("✓ Test mode: Using 3 roles to save costs")
 
         # If test mode changed, update and reinitialize
-        if test_mode != st.session_state.get('test_mode', True):
+        if test_mode != st.session_state.get('test_mode', False):
             st.session_state.test_mode = test_mode
             if 'coach' in st.session_state:
                 del st.session_state.coach  # Force reinitialization
