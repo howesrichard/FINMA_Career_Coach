@@ -70,7 +70,8 @@ class RateLimiter:
             return {
                 'requests_made': 0,
                 'requests_remaining': self.max_requests,
-                'window_minutes': self.window_seconds // 60
+                'window_minutes': self.window_seconds // 60,
+                'max_requests': self.max_requests
             }
 
         now = time.time()
