@@ -32,6 +32,9 @@ class ContentLoader:
         self.test_mode = test_mode
         self.use_summaries = use_summaries
 
+        # Cache for loaded profiles to avoid re-reading files
+        self._profiles_cache = None
+
         # Validate paths exist
         if not self.reference_path.exists():
             raise FileNotFoundError(f"Reference folder not found: {self.reference_path}")
@@ -41,10 +44,15 @@ class ContentLoader:
         Load all role profile files from the roles directory.
         In test mode, only loads 3 shortest profiles.
         If use_summaries=True, loads from roles_summary folder.
+        Results are cached to avoid re-reading files.
 
         Returns:
             Dictionary mapping role filename (without .typ) to file content
         """
+        # Return cached profiles if already loaded
+        if self._profiles_cache is not None:
+            return self._profiles_cache
+
         # Choose source directory based on use_summaries setting
         if self.use_summaries:
             source_path = self.summaries_path
@@ -80,6 +88,8 @@ class ContentLoader:
         elif self.use_summaries:
             print(f"[SUMMARY MODE] Loaded {len(profiles)} role summaries")
 
+        # Cache the result
+        self._profiles_cache = profiles
         return profiles
 
     def load_full_role_profile(self, role_name: str) -> str:
